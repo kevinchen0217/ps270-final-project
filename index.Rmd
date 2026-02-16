@@ -1,14 +1,11 @@
 ---
 title: "PS270 Final Project"
-author: "Your Name Here"
-description: "My final project"
+author: "Kevin Chen"
+description: "Gerrymandering and its Effect on Electoral Outcomes"
 output:
   distill::distill_article:
     self_contained: false
 ---
 
-
-
 ## Project thoughts
-
-I am interested in exploring data related to...
+I am interested in studying gerrymandering and how district boundaries influence election outcomes. Rather than looking only at who wins elections, I want to explore whether the way districts are drawn affects how competitive elections are. In particular, I plan to examine whether some states consistently have more safe districts while others have more close races. Using publicly available election results and redistricting measures, this project will analyze whether district design shapes democratic competition.
