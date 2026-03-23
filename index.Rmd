@@ -25,6 +25,8 @@ house_20_22 <- house |>
 head(house_20_22)
 ```
 
+## Visualization 1
+
 ```{r}
 library(tidyverse)
 
@@ -57,6 +59,7 @@ ggplot(margins, aes(x = margin, color = factor(year))) +
   theme_minimal()
 ```
 
+## Visualization 2
 
 ```{r fig.width=9, fig.height=8}
 library(tidyverse)
