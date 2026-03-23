@@ -11,7 +11,7 @@ output:
 I am interested in studying gerrymandering and how district boundaries influence election outcomes. Rather than looking only at who wins elections, I want to explore whether the way districts are drawn affects how competitive elections are. In particular, I plan to examine whether some states consistently have more safe districts while others have more close races. Using publicly available election results and redistricting measures, this project will analyze whether district design shapes democratic competition.
 
 ## Data and Research Question Proposal
-Does partisan gerrymandering make U.S. House elections less competitive? This study aims to analyze the degree to which states exhibiting greater disproportionality between votes and seats encounter more substantial increases in average district victory margins following the 2020 redistricting cycle. I hypothesize that in states where one party ended up with more seats than its share of the statewide vote, the 2022 elections were likely less competitive than the 2020 elections. The data set for my analysis comprises all U.S. states that had two or more congressional districts in both 2020 and 2022. States with a single congressional district, which include Alaska, Delaware, North Dakota, South Dakota, Vermont, and Wyoming, are excluded from the analysis, as is Montana, which had only one congressional district in 2020. Each data unit is a state in a particular election cycle. The dataset I will use is the 1976–2024 U.S. House election results from the MIT Election Data and Science Lab. This dataset includes the votes received by each candidate in every congressional district for all U.S. House elections between 1976 and 2024. I will use these variables to calculate the proportion of seats won by the dominant party and average district margins of victory for each state in 2020 and 2022. The explanatory variable of interest is vote-seat disproportionality, measured as the difference between the proportion of seats won by the dominant party in a state and the proportion of votes that party received statewide in 2022. The result is a change in the average margin of victory, which is calculated by taking the difference between 2022 and 2020. The higher the positive value, the more the competition has decreased. If I observe that states with higher vote-seat disproportionality show larger increases in average district margins, this would provide support for my hypothesis. Conversely, if disproportional states show similar or smaller changes in competitiveness relative to proportional states, this would provide evidence against my hypothesis. When I run a regression of the change in average district margin on vote-seat disproportionality, a positive, statistically significant coefficient on the disproportionality variable would indicate support for my hypothesis.
+Does partisan gerrymandering make U.S. House elections less competitive? This study aims to analyze the degree to which states exhibiting greater disproportionality between votes and seats encounter more substantial increases in average district victory margins following the 2020 redistricting cycle. I hypothesize that in states where one party ended up with more seats than its share of the statewide vote, the 2022 elections were likely less competitive than the 2020 elections. The data set for my analysis comprises all U.S. states that had two or more congressional districts in both 2020 and 2022. States with a single congressional district, which include Alaska, Delaware, North Dakota, South Dakota, Vermont, and Wyoming, are excluded from the analysis, as is Montana, which had only one congressional district in 2020. Each data unit is a state in a particular election cycle. The data set I will use is the 1976–2024 U.S. House election results from the MIT Election Data and Science Lab. This data set includes the votes received by each candidate in every congressional district for all U.S. House elections between 1976 and 2024. I will use these variables to calculate the proportion of seats won by the dominant party and average district margins of victory for each state in 2020 and 2022. The explanatory variable of interest is vote-seat disproportionality, measured as the difference between the proportion of seats won by the dominant party in a state and the proportion of votes that party received statewide in 2022. The result is a change in the average margin of victory, which is calculated by taking the difference between 2022 and 2020. The higher the positive value, the more the competition has decreased. If I observe that states with higher vote-seat disproportionality show larger increases in average district margins, this would provide support for my hypothesis. Conversely, if disproportional states show similar or smaller changes in competitiveness relative to proportional states, this would provide evidence against my hypothesis. When I run a regression of the change in average district margin on vote-seat disproportionality, a positive, statistically significant coefficient on the disproportionality variable would indicate support for my hypothesis.
 
 ```{r}
 library(readr) 
@@ -23,4 +23,83 @@ house_20_22 <- house |>
   filter(year %in% c(2020, 2022)) 
 
 head(house_20_22)
+```
+
+```{r}
+library(tidyverse)
+
+house <- read_delim("data/1976-2024-house.tab",
+                    delim = "\t",
+                    show_col_types = FALSE)
+
+house_subset <- house_20_22 |>
+  filter(year %in% c(2020, 2022), stage == "GEN")
+
+margins <- house_subset |>
+  group_by(year, state, district) |>
+  arrange(desc(candidatevotes)) |>
+  slice_head(n = 2) |>
+  summarise(
+    winner_votes = first(candidatevotes),
+    runnerup_votes = last(candidatevotes),
+    totalvotes = first(totalvotes),
+    margin = (winner_votes - runnerup_votes) / totalvotes * 100
+  )
+
+ggplot(margins, aes(x = margin, color = factor(year))) +
+  geom_density(size = 1) +
+  labs(
+    title = "Distribution of House Election Victory Margins",
+    x = "Victory Margin",
+    y = "Density",
+    color = "Year"
+  ) +
+  theme_minimal()
+```
+
+
+```{r fig.width=9, fig.height=8}
+library(tidyverse)
+
+margins <- house_subset |>
+  group_by(year, state, district) |>
+  arrange(desc(candidatevotes)) |>
+  slice_head(n = 2) |>
+  summarise(
+    winner_votes = first(candidatevotes),
+    runnerup_votes = last(candidatevotes),
+    totalvotes = first(totalvotes),
+    margin = (winner_votes - runnerup_votes) / totalvotes,
+    .groups = "drop"
+  )
+
+state_margins <- margins |>
+  group_by(state, year) |>
+  summarise(avg_margin = mean(margin), .groups = "drop")
+
+state_margins <- state_margins |>
+  filter(!(state %in% c(
+    "ALASKA","DELAWARE","DISTRICT OF COLUMBIA","MONTANA",
+    "NORTH DAKOTA","SOUTH DAKOTA","VERMONT","WYOMING"
+  )))
+
+state_change <- state_margins |>
+  pivot_wider(names_from = year, values_from = avg_margin) |>
+  mutate(change = (`2022` - `2020`) * 100)
+
+ggplot(state_change, aes(x = reorder(state, change), y = change)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(
+    title = "Change in U.S. House Election Competitiveness by State",
+    subtitle = "Average District Victory Margin (2022 minus 2020, percentage points)",
+    x = "State",
+    y = "Change in Margin (Percentage Points)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 10),
+    plot.title = element_text(face = "bold", size = 15),
+    plot.subtitle = element_text(size = 12)
+  )
 ```
