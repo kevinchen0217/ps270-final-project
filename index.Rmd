@@ -106,3 +106,54 @@ ggplot(state_change, aes(x = reorder(state, change), y = change)) +
     plot.subtitle = element_text(size = 12)
   )
 ```
+
+```{r}
+state_results <- house_subset |>
+  group_by(year, state, party) |>
+  summarise(
+    votes = sum(candidatevotes),
+    .groups = "drop"
+  ) |>
+  group_by(year, state) |>
+  mutate(vote_share = votes / sum(votes)) |>
+  ungroup()
+
+winners <- house_subset |>
+  group_by(year, state, district) |>
+  slice_max(candidatevotes, n = 1) |>
+  ungroup()
+
+seat_share <- winners |>
+  group_by(year, state, party) |>
+  summarise(seats = n(), .groups = "drop") |>
+  group_by(year, state) |>
+  mutate(seat_share = seats / sum(seats))
+
+disprop <- left_join(state_results, seat_share,
+                     by = c("year", "state", "party")) |>
+  filter(year == 2022) |>
+  mutate(disproportionality = abs(seat_share - vote_share))
+
+disprop_state <- disprop |>
+  group_by(state) |>
+  summarise(disprop = sum(disproportionality, na.rm = TRUE))
+
+final_data <- left_join(state_change, disprop_state, by = "state")
+
+fit <- lm(change ~ disprop, data = final_data)
+summary(fit)
+
+library(broom)
+library(knitr)
+
+fit |>
+  tidy() |>
+  select(term, estimate, p.value) |>
+  kable(
+    caption = "Effect of Disproportionality on Change in Competitiveness",
+    col.names = c("Variable", "Estimate", "P-value"),
+    digits = 3
+  )
+```
+
+The regression analysis examines the relationship between vote-seat disproportionality and changes in electoral competitiveness between the 2020 and 2022 U.S. House elections. The estimated coefficient on disproportionality is negative (-6.43), suggesting that states with higher levels of disproportionality tended, if anything, to experience slightly smaller increases (or even decreases) in victory margins. In other words, more disproportional states were not associated with less competitive elections, contrary to the initial hypothesis. However, this relationship is not statistically significant (p = 0.457), indicating that the observed association could easily be due to random variation rather than a systematic pattern. Overall, these results do not provide evidence that vote-seat disproportionality is meaningfully related to changes in electoral competitiveness across states following the 2020 redistricting cycle. This suggests that the effects of gerrymandering may be more localized at the district level or may not be fully captured by this measure of disproportionality. Additionally, the lack of statistical significance may be due to the relatively small sample size (state-level observations), which limits statistical power.
