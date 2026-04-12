@@ -107,6 +107,8 @@ ggplot(state_change, aes(x = reorder(state, change), y = change)) +
   )
 ```
 
+## Analysis
+
 ```{r}
 state_results <- house_subset |>
   group_by(year, state, party) |>
