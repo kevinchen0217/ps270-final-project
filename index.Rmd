@@ -1,95 +1,73 @@
 ---
-title: "PS270 Final Project"
+title: "Gerrymandering and Electoral Competitiveness in U.S. House Elections (2020–2022)"
 author: "Kevin Chen"
-description: "Gerrymandering and its Effect on Electoral Outcomes"
+description: "An empirical analysis of whether vote-seat disproportionality is associated with changes in electoral competitiveness following the 2020 redistricting cycle."
 output:
   distill::distill_article:
     self_contained: false
 ---
 
-## Project thoughts
-I am interested in studying gerrymandering and how district boundaries influence election outcomes. Rather than looking only at who wins elections, I want to explore whether the way districts are drawn affects how competitive elections are. In particular, I plan to examine whether some states consistently have more safe districts while others have more close races. Using publicly available election results and redistricting measures, this project will analyze whether district design shapes democratic competition.
+## Introduction
 
-## Data and Research Question Proposal
-Does partisan gerrymandering make U.S. House elections less competitive? This study aims to analyze the degree to which states exhibiting greater disproportionality between votes and seats encounter more substantial increases in average district victory margins following the 2020 redistricting cycle. I hypothesize that in states where one party ended up with more seats than its share of the statewide vote, the 2022 elections were likely less competitive than the 2020 elections. The data set for my analysis comprises all U.S. states that had two or more congressional districts in both 2020 and 2022. States with a single congressional district, which include Alaska, Delaware, North Dakota, South Dakota, Vermont, and Wyoming, are excluded from the analysis, as is Montana, which had only one congressional district in 2020. Each data unit is a state in a particular election cycle. The data set I will use is the 1976–2024 U.S. House election results from the MIT Election Data and Science Lab. This data set includes the votes received by each candidate in every congressional district for all U.S. House elections between 1976 and 2024. I will use these variables to calculate the proportion of seats won by the dominant party and average district margins of victory for each state in 2020 and 2022. The explanatory variable of interest is vote-seat disproportionality, measured as the difference between the proportion of seats won by the dominant party in a state and the proportion of votes that party received statewide in 2022. The result is a change in the average margin of victory, which is calculated by taking the difference between 2022 and 2020. The higher the positive value, the more the competition has decreased. If I observe that states with higher vote-seat disproportionality show larger increases in average district margins, this would provide support for my hypothesis. Conversely, if disproportional states show similar or smaller changes in competitiveness relative to proportional states, this would provide evidence against my hypothesis. When I run a regression of the change in average district margin on vote-seat disproportionality, a positive, statistically significant coefficient on the disproportionality variable would indicate support for my hypothesis.
+This project examines whether partisan differences between votes and seats in U.S. House elections are associated with changes in electoral competitiveness following the 2020 redistricting cycle. Specifically, the research question is: **Do states with greater vote-seat disproportionality experience larger changes in electoral competitiveness between the 2020 and 2022 U.S. House elections?** This question is important because concerns about gerrymandering often focus on whether district maps reduce electoral competition and create “safe seats,” which may weaken democratic accountability. I hypothesize that states with higher levels of vote-seat disproportionality will experience larger increases in average district victory margins from 2020 to 2022. The theoretical expectation is that when district outcomes are less proportional to statewide vote shares, electoral competition is reduced because district boundaries may concentrate opposition voters into fewer districts, making remaining districts safer for the dominant party. This relationship has broader implications for democratic representation, as less competitive elections may reduce accountability and weaken incentives for elected officials to remain responsive to constituents. Understanding this relationship is particularly relevant in the context of ongoing debates over redistricting reform and the fairness of electoral institutions in the United States. By examining whether disproportionality is linked to measurable changes in competitiveness, this analysis provides empirical evidence that can add to discussions about the real-world consequences of gerrymandering.
 
-```{r}
-library(readr) 
-library(dplyr) 
+## Data and Measurement
 
-house <- read_csv("data/1976-2024-house.tab") 
+This project uses U.S. House election data from the MIT Election Data and Science Lab, which includes district-level vote totals for all House elections from 1976 to 2024. The dataset contains variables such as state, district, year, party affiliation, candidate votes, and total votes cast. For this analysis, I focus on the 2020 and 2022 general elections. The key dependent variable is electoral competitiveness, measured as the average margin of victory in each congressional district within a state. The margin is calculated as the difference in vote share between the winning and runner-up candidates, and these district-level margins are then averaged at the state level for each election year. The key independent variable is vote-seat disproportionality, which captures the difference between a party’s share of statewide votes and its share of congressional seats in 2022, reflecting the extent to which electoral outcomes deviate from proportional representation. 
 
-house_20_22 <- house |> 
-  filter(year %in% c(2020, 2022)) 
+To account for potential pre-existing differences across states, I include a control variable capturing baseline competitiveness, defined as the average district-level victory margin in 2020. The analysis adopts a cross-sectional design at the state level, examining how changes in competitiveness between 2020 and 2022 vary across states while excluding those with only a single congressional district. Both vote-seat disproportionality and changes in average victory margins should exhibit sufficient cross-state variation in order to enable meaningful comparison. Evidence in support of the hypothesis would consist of a positive and statistically significant association between disproportionality and changes in margins, whereas a statistically insignificant or negative relationship would indicate little evidence that disproportionality reduces electoral competitiveness.
 
-head(house_20_22)
-```
+The plot below shows the distribution of the change in average district victory margins across states in 2020 and 2022. Positive values indicate declining electoral competitiveness (larger victory margins), while negative values indicate increasing competitiveness (smaller victory margins).
 
-## Visualization 1
-
-```{r}
+```{r fig.width=9, fig.height=8, echo=FALSE}
 library(tidyverse)
+library(knitr)
+library(broom)
 
-house <- read_delim("data/1976-2024-house.tab",
-                    delim = "\t",
-                    show_col_types = FALSE)
+# Load Data
+house <- read_csv("data/1976-2024-house.tab", 
+                  show_col_types = FALSE)
 
-house_subset <- house_20_22 |>
-  filter(year %in% c(2020, 2022), stage == "GEN")
+# Filter to 2020–2022 Analysis Sample
+house_subset <- house |>
+  filter(
+    year %in% c(2020, 2022),
+    stage == "GEN",
+    mode == "TOTAL")
 
+# Compute District-Level Victory Margins
 margins <- house_subset |>
   group_by(year, state, district) |>
-  arrange(desc(candidatevotes)) |>
-  slice_head(n = 2) |>
-  summarise(
-    winner_votes = first(candidatevotes),
-    runnerup_votes = last(candidatevotes),
-    totalvotes = first(totalvotes),
-    margin = (winner_votes - runnerup_votes) / totalvotes * 100
-  )
-
-ggplot(margins, aes(x = margin, color = factor(year))) +
-  geom_density(size = 1) +
-  labs(
-    title = "Distribution of House Election Victory Margins",
-    x = "Victory Margin",
-    y = "Density",
-    color = "Year"
-  ) +
-  theme_minimal()
-```
-
-## Visualization 2
-
-```{r fig.width=9, fig.height=8}
-library(tidyverse)
-
-margins <- house_subset |>
-  group_by(year, state, district) |>
-  arrange(desc(candidatevotes)) |>
-  slice_head(n = 2) |>
+  slice_max(candidatevotes, n = 2, with_ties = FALSE) |>
   summarise(
     winner_votes = first(candidatevotes),
     runnerup_votes = last(candidatevotes),
     totalvotes = first(totalvotes),
     margin = (winner_votes - runnerup_votes) / totalvotes,
-    .groups = "drop"
-  )
+    .groups = "drop")
 
+# Aggregate to State-Level Margins
 state_margins <- margins |>
   group_by(state, year) |>
   summarise(avg_margin = mean(margin), .groups = "drop")
 
+# Exclude Single-District States
 state_margins <- state_margins |>
   filter(!(state %in% c(
-    "ALASKA","DELAWARE","DISTRICT OF COLUMBIA","MONTANA",
-    "NORTH DAKOTA","SOUTH DAKOTA","VERMONT","WYOMING"
-  )))
+    "ALASKA","DELAWARE","DISTRICT OF COLUMBIA","NORTH DAKOTA","SOUTH DAKOTA","VERMONT","WYOMING")))
 
+# Construct Change in Competitiveness
 state_change <- state_margins |>
   pivot_wider(names_from = year, values_from = avg_margin) |>
   mutate(change = (`2022` - `2020`) * 100)
 
+# Control Variable
+baseline_2020 <- state_margins |>
+  filter(year == 2020) |>
+  select(state, avg_margin) |>
+  rename(avg_margin_2020 = avg_margin)
+
+# Plot Change in Competitiveness
 ggplot(state_change, aes(x = reorder(state, change), y = change)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
@@ -97,29 +75,33 @@ ggplot(state_change, aes(x = reorder(state, change), y = change)) +
     title = "Change in U.S. House Election Competitiveness by State",
     subtitle = "Average District Victory Margin (2022 minus 2020, percentage points)",
     x = "State",
-    y = "Change in Margin (Percentage Points)"
-  ) +
+    y = "Change in Margin (Percentage Points)") +
   theme_minimal() +
   theme(
-    axis.text.y = element_text(size = 10),
+    axis.text.y = element_text(size = 8),
     plot.title = element_text(face = "bold", size = 15),
-    plot.subtitle = element_text(size = 12)
-  )
+    plot.subtitle = element_text(size = 12))
 ```
 
-## Analysis
+## Electoral Competitiveness and Vote–Seat Disproportionality
 
-```{r}
+To examine the relationship between vote-seat disproportionality and changes in electoral competitiveness, I estimate a linear regression where the dependent variable is the change in average district victory margin between 2020 and 2022, and the independent variable is vote-seat disproportionality in 2022.
+
+The figure below shows the relationship between disproportionality and changes in competitiveness across states.
+
+```{r, echo=FALSE}
+
+# Compute State Vote Shares
 state_results <- house_subset |>
   group_by(year, state, party) |>
   summarise(
     votes = sum(candidatevotes),
-    .groups = "drop"
-  ) |>
+    .groups = "drop") |>
   group_by(year, state) |>
   mutate(vote_share = votes / sum(votes)) |>
   ungroup()
 
+# Compute Seat Shares
 winners <- house_subset |>
   group_by(year, state, district) |>
   slice_max(candidatevotes, n = 1) |>
@@ -131,6 +113,7 @@ seat_share <- winners |>
   group_by(year, state) |>
   mutate(seat_share = seats / sum(seats))
 
+# Construct Disproportionality Measure
 disprop <- left_join(state_results, seat_share,
                      by = c("year", "state", "party")) |>
   filter(year == 2022) |>
@@ -140,22 +123,67 @@ disprop_state <- disprop |>
   group_by(state) |>
   summarise(disprop = sum(disproportionality, na.rm = TRUE))
 
+# Merge Final Analysis Dataset
 final_data <- left_join(state_change, disprop_state, by = "state")
 
-fit <- lm(change ~ disprop, data = final_data)
-summary(fit)
+final_data <- final_data |>
+  left_join(baseline_2020, by = "state")
 
-library(broom)
-library(knitr)
+# Scatterplot + Regression Line
+ggplot(final_data, aes(x = disprop, y = change)) +
+  geom_point(size = 2, alpha = 0.7, color = "black") +
+  geom_smooth(method = "lm", se = TRUE, na.rm = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Gerrymandering and Changes in Electoral Competitiveness",
+    subtitle = "State-level relationship (2020–2022)",
+    x = "Vote-Seat Disproportionality",
+    y = "Change in Victory Margin (Percentage Points)") +
+  theme_minimal()
+```
 
-fit |>
-  tidy() |>
-  select(term, estimate, p.value) |>
+The scatterplot shows little evidence of a systematic relationship between vote-seat disproportionality and changes in electoral competitiveness. The fitted regression line is nearly flat, suggesting that variation in disproportionality does not correspond strongly with changes in average district margins across states.
+
+The regression results are shown in the table below.
+
+```{r, echo=FALSE}
+
+# Regression Model
+fit1 <- lm(change ~ disprop, data = final_data)
+
+fit2 <- lm(change ~ disprop + avg_margin_2020, data = final_data)
+
+# Regression Table
+bind_rows(
+  tidy(fit1) |> mutate(model = "Model 1: Baseline"),
+  tidy(fit2) |> mutate(model = "Model 2: + 2020 Competitiveness")
+) |>
+  mutate(
+    term = case_when(
+      term == "(Intercept)" ~ "Intercept",
+      term == "disprop" ~ "Vote-Seat Disproportionality",
+      term == "avg_margin_2020" ~ "2020 Average Margin"
+    ),
+    estimate = round(estimate, 3),
+    std.error = round(std.error, 3),
+    p.value = round(p.value, 3)
+  ) |>
+  select(model, term, estimate, std.error, p.value) |>
   kable(
-    caption = "Effect of Disproportionality on Change in Competitiveness",
-    col.names = c("Variable", "Estimate", "P-value"),
-    digits = 3
+    caption = "Regression Results: Disproportionality and Changes in Competitiveness (with baseline control)",
+    col.names = c("Model", "Variable", "Estimate", "Std. Error", "P-value"),
+    align = "llccc"
   )
 ```
 
-The regression analysis examines the relationship between vote-seat disproportionality and changes in electoral competitiveness between the 2020 and 2022 U.S. House elections. The estimated coefficient on disproportionality is negative (-6.43), suggesting that states with higher levels of disproportionality tended, if anything, to experience slightly smaller increases (or even decreases) in victory margins. In other words, more disproportional states were not associated with less competitive elections, contrary to the initial hypothesis. However, this relationship is not statistically significant (p = 0.457), indicating that the observed association could easily be due to random variation rather than a systematic pattern. Overall, these results do not provide evidence that vote-seat disproportionality is meaningfully related to changes in electoral competitiveness across states following the 2020 redistricting cycle. This suggests that the effects of gerrymandering may be more localized at the district level or may not be fully captured by this measure of disproportionality. Additionally, the lack of statistical significance may be due to the relatively small sample size (state-level observations), which limits statistical power.
+The estimated coefficient on vote-seat disproportionality is negative (β = -5.039), indicating that states with greater disproportionality tend to experience decreases (or smaller increases) in average victory margins between 2020 and 2022. This suggests that, if anything, higher levels of disproportionality are associated with slightly more competitive elections rather than less competitive ones. However, this estimate is imprecise, as indicated by the relatively large standard error (SE = 8.391), which means there is substantial uncertainty around the coefficient. The relationship is also not statistically significant (p = 0.551), meaning that we cannot reject the null hypothesis of no association. As a result, the observed pattern could plausibly be due to random variation rather than a systematic relationship across states. Substantively, these findings do not provide evidence that vote-seat disproportionality meaningfully influences changes in electoral competitiveness at the state level. One possible explanation is that the effects of redistricting are more strongly seen at the district level, where boundaries are drawn, rather than in aggregated state-level patterns. This analysis is observational, and unobserved factors such as political geography, candidate quality, or differences in redistricting institutions may influence both disproportionality and competitiveness, limiting causal interpretation.
+
+To evaluate whether this relationship is robust to alternative explanations, I estimated a second model that includes a control for baseline competitiveness in 2020. In this specification, the coefficient on vote-seat disproportionality remains negative (β = -8.030) and statistically insignificant with a large standard error (SE = 7.762, p = 0.307), indicating that the inclusion of this control does not change the estimated relationship. The persistence of a negative but imprecisely estimated coefficient across models supports the conclusion that there is no clear systematic association between disproportionality and changes in competitiveness. In contrast, baseline competitiveness in 2020 is as a strong and statistically significant predictor of change (β = -28.854, SE = 9.664, p = 0.005). This result indicates that states with larger initial victory margins (those that were less competitive in 2020) tended to experience greater declines, or smaller increases, in margins over time. Substantively, this suggests that pre-existing electoral conditions are a more important driver of changes in competitiveness than vote-seat disproportionality. Overall, the results from this model strengthen the interpretation that the observed relationship between disproportionality and competitiveness is weak and not robust to the inclusion of relevant controls.
+
+## Conclusion
+
+This study examined whether vote-seat disproportionality is associated with changes in electoral competitiveness following the 2020 redistricting cycle. Overall, the results do not provide evidence of a systematic relationship between disproportionality and changes in competitiveness. Taken together, these findings provide little support for the original hypothesis, as the expected positive relationship between disproportionality and declining competitiveness is not observed in the data. Instead, baseline levels of competitiveness emerge as a stronger predictor of electoral change, suggesting that pre-existing conditions play a more important role than seat-vote imbalances. Several limitations should be noted. First, the analysis is conducted at the state level, which may obscure important variation at the district level where gerrymandering operates most directly. Second, the relatively small sample size limits statistical power. Third, vote-seat disproportionality may not fully capture the complexity of redistricting effects. With additional time and resources, this analysis could be extended by incorporating panel data across multiple election cycles to better capture changes over time and improve the precision of the estimates.
+
+```{r print-code, ref.label=knitr::all_labels(), echo = TRUE, eval=FALSE}
+
+```
